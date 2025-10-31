@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import voigt_profile
@@ -6,6 +8,7 @@ from pymatgen.analysis.diffraction.xrd import XRDCalculator
 from tqdm import tqdm
 import os
 import random
+from __params__ import *
 
 """ 
 requirements:
@@ -171,31 +174,16 @@ def generate_xrd(phases_info,
 
     return x_axis, y_total
 
+def generate_n_patterns(N_PATTERNS=1000, phases_info_base=[[None]], head=None):
+    print(f"Запуск массовой генерации {N_PATTERNS} дифрактограмм...")
 
-# --- ПРИМЕР ИСПОЛЬЗОВАНИЯ ---
-if __name__ == "__main__":
-
-    print("Запуск массовой генерации 100 дифрактограмм...")
-
-    N_PATTERNS = 100
-    OUTPUT_DIR = "generated_patterns"
+    OUTPUT_DIR = f"generated_patterns_{time.strftime('%Y%m%d-%H%M%S')}"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    # состав фаз
-    phases_info_base = [
-        ["C.cif", 99.7, 2.9, 0.0012, 3.5],
-        ["Co.cif", 0.3, None, None, 10.06]
-    ]
-
-    # Значения "по умолчанию"
-    default_params = {
-        'U': 0.0004, 'V': -0.0002, 'W': 0.0025, 'X': 0.003, 'Y': 0.0,
-        'zero_shift': 0.0,
-        'counts': 25000.0
-    }
-
+    head += "\nRate-% OKR-nm e\n"
+    # Значения "по умолчанию" (модель Войта и другое). Около них варьируются значения
     try:
         for i in tqdm(range(N_PATTERNS), desc="Генерация..."):
+            phases_info_base_ = phases_info_base.copy()
             current_params = {
                 'inst_U': random.uniform(default_params['U'] * 0.8, default_params['U'] * 1.2),
                 'inst_V': random.uniform(default_params['V'] * 0.8, default_params['V'] * 1.2),
@@ -205,13 +193,18 @@ if __name__ == "__main__":
 
                 'zero_shift': random.uniform(-0.05, 0.05),  # Сдвиг от -0.05 до +0.05
 
-                'target_peak_counts': random.uniform(500, 4000)  # Разный уровень шума
+                'target_peak_counts': random.uniform(1000, 4000)  # Разный уровень шума
             }
 
-            output_file = os.path.join(OUTPUT_DIR, f"pattern_{i:04d}.xy")
+            for line in phases_info_base_:
+                for j in range(1,4):
+                    line[j] = random.uniform(line[j] * 0.8, line[j] * 1.2)
+
+
+            output_file = os.path.join(OUTPUT_DIR, f"{i}.xy")
 
             # Вызываем функцию со всеми новыми параметрами
-            generate_xrd(phases_info_base,
+            generate_xrd(phases_info_base_,
                          zero_shift=current_params['zero_shift'],
                          inst_U=current_params['inst_U'],
                          inst_V=current_params['inst_V'],
@@ -222,6 +215,12 @@ if __name__ == "__main__":
                          output_filename=output_file,
                          show_plot=False
                          )
+            for line in phases_info_base_:
+                for k in range(1,4):
+                    head = head + f"{line[k]} "
+                head += "-- "
+            head += "\n"
+
 
         print(f"\nГотово! {N_PATTERNS} файлов сохранено в папку '{OUTPUT_DIR}'.")
 
@@ -230,3 +229,6 @@ if __name__ == "__main__":
         print("Пожалуйста, убедитесь, что 'C.cif' и 'Co.cif' лежат рядом со скриптом.")
     except Exception as e:
         print(f"Произошла ошибка: {e}")
+
+    with open("info.txt", "w") as f:
+        f.write(head)
